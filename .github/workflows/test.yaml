@@ -1,0 +1,46 @@
+name: Build and Deploy
+on:
+  # (Optional) Allows users to trigger the workflow manually from the GitHub UI
+  workflow_dispatch:
+
+  # Triggers the workflow on push to matching branches
+  push:
+    branches:
+      - develop
+env:
+  duplo_host: https://test06.duplocloud.net  # CHANGE ME!
+  duplo_token: "${{ secrets.DUPLO_TOKEN }}"
+  IMAGE_NAME: plume-test-image                    # CHANGE ME!
+  TENANT_NAME: akshay01                        # CHANGE ME!
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build:
+    name: Build
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Set up for docker build
+      - name: Get AWS credentials
+        uses: duplocloud/ghactions-aws-jit@master
+        with:
+          tenant: default
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build and push the docker image
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          file: ./Dockerfile
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            
+    # This part is important - it will be used by the deploy job
+    outputs:
+      image: "${{ steps.login-ecr.outputs.registry }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
